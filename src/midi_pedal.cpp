@@ -1,7 +1,10 @@
+#include <Arduino.h>
 #include <Bounce2.h>
+#include <led_display.h>
+#include <rgb_led.h>
 
 #define NUM_BUTTONS (3)
-#define NUM_RGB_LED_PINS (3)
+
 #define BTN_A (1 << 0)
 #define BTN_B (1 << 1)
 #define BTN_C (1 << 2)
@@ -11,39 +14,6 @@ int midi_channel = DEFAULT_MIDI_CHANNEL;
 const int ledPins[NUM_RGB_LED_PINS] = { 15, 14, 13 };
 unsigned long debounceDelay = 100;    // the debounce time; increase if the output flickers
 unsigned long doubleClickDelay = 150;
-
-int ledState = LOW;
-
-typedef enum {
-  LED_OFF = 0,
-  RED,
-  GREEN,
-  BLUE,
-  WHITE,
-  YELLOW,
-  PURPLE,
-  CYAN
-} COLOUR_NAME;
-
-struct RGB_COLOUR_T
-{
-  int r;
-  int g;
-  int b;
-};
-
-RGB_COLOUR_T rgb_colours[] = {
-  {0, 0, 0},        // LED_OFF
-  {255, 0, 0},      // RED
-  {0, 255, 0},      // GREEN
-  {0, 0, 255},      // BLUE
-  {255, 255, 255},  // WHITE
-  {255, 255, 0},    // YELLOW
-  {255, 0, 255},    // PURPLE
-  {0, 255, 255}     // CYAN
-};
-
-int last_led_colour = LED_OFF;
 
 typedef struct Button
 {
@@ -61,18 +31,7 @@ Button controls[3] = {
   {19, NULL, 3, RED},
 };
 
-void updateLED(int colour_id)
-{
-  RGB_COLOUR_T colour = rgb_colours[colour_id];
-  //Only record last colour if not turning LED OFF
-  if (colour_id != LED_OFF)
-  {
-    last_led_colour = colour_id;
-  }
-  analogWrite(ledPins[0], colour.r);
-  analogWrite(ledPins[1], colour.g);
-  analogWrite(ledPins[2], colour.b);
-}
+RGBLed rgb_led(15, 14, 13);
 
 void setup()
 {    
@@ -81,11 +40,11 @@ void setup()
     {
       controls[i].state = &bounce[i];
       pinMode(controls[i].pin_id, INPUT_PULLUP);
-      pinMode(ledPins[i], OUTPUT);
       controls[i].state->attach(controls[i].pin_id);
       controls[i].state->interval(10);
     }
-    updateLED(LED_OFF);
+    rgb_led.chase();
+    rgb_led.off();
 }
 
 int getButtonStates()
@@ -120,19 +79,7 @@ void bank_decrease()
   }
 }
 
-void led_toggle()
-{
-  ledState = !ledState;
-  Serial.println(ledState);
-  if (ledState)
-  {
-    updateLED(LED_OFF);
-  }
-  else
-  {
-    updateLED(last_led_colour);
-  }
-}
+
 
 void loop()
 {
@@ -150,32 +97,42 @@ void loop()
 
             switch (btnState)
             {
+              // PRORGAM SELECT ======
               case BTN_A:
                 Serial.println("A");
-                updateLED(controls[0].colour);
+                rgb_led.write(controls[0].colour);
                 usbMIDI.sendProgramChange(control.program_id, midi_channel);
                 break;
               case BTN_B:
                 Serial.println("B");
-                updateLED(controls[1].colour);
+                rgb_led.write(controls[1].colour);
                 usbMIDI.sendProgramChange(control.program_id, midi_channel);
                 break;
               case BTN_C:
                 Serial.println("C");
-                updateLED(controls[2].colour);
+                rgb_led.write(controls[2].colour);
                 usbMIDI.sendProgramChange(control.program_id, midi_channel);
                 break;
+              // ======================
+              
+              // BANK DOWN
               case (BTN_A | BTN_B):
                 bank_decrease();
                 Serial.println(bank);
                 break;
+              // BANK UP  
               case (BTN_B | BTN_C):
                 bank_increase();
                 Serial.println(bank);
                 break;
+              // LED ON/OFF
               case (BTN_A | BTN_C):
-                led_toggle();
+                rgb_led.toggle();
                 Serial.println("LED_TOGGLE");
+                break;
+              // MUTE
+              case (BTN_A | BTN_B | BTN_C):
+                usbMIDI.sendProgramChange(127, 1);
                 break;
               default:
                 break;
