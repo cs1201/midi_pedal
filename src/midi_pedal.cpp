@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <Bounce2.h>
-#include <led_display.h>
-#include <rgb_led.h>
+#include <LEDDisplay.h>
+#include <RGBLed.h>
 
 #define NUM_BUTTONS (3)
 
